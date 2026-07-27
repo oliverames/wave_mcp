@@ -1,10 +1,14 @@
-# Wave Accounting MCP Server Requirements
+# Wave Accounting MCP Server dependencies
 
-# Core MCP framework
-mcp>=1.0.0
+# MCP framework. 1.2+ provides FastMCP, which this server is built on.
+mcp>=1.2.0
 
-# HTTP client for API requests
+# Async HTTP client for the GraphQL transport
 httpx>=0.24.0
 
-# Environment variable management
+# Loads WAVE_ACCESS_TOKEN from a .env file
 python-dotenv>=1.0.0
+
+# Development only:
+#   pytest>=7.0      test suite
+#   pyflakes>=3.0    lint
