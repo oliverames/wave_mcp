@@ -12,7 +12,7 @@ from typing import Optional
 from .. import fragments as f
 from ..formatting import address as fmt_address
 from ..formatting import kv_block, listing, render, yes_no
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import compact
 
 LIST_VENDORS = f.build(
@@ -67,17 +67,17 @@ CREATE_HINT = (
 )
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_vendors(
     business_id: Optional[str] = None,
     email: Optional[str] = None,
     name_contains: Optional[str] = None,
     modified_after: Optional[str] = None,
     modified_before: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List vendors -- the suppliers a business buys from.
 
@@ -127,11 +127,11 @@ async def wave_list_vendors(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_vendor(
     vendor_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one vendor by ID, including address and shipping details.
 

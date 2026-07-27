@@ -49,14 +49,21 @@ and set `WAVE_ACCESS_TOKEN` in `.env`.
 | `WAVE_BUSINESS_ID` | No | Default business, so tools can omit `business_id` |
 | `WAVE_MCP_LOG_LEVEL` | No | `DEBUG`, `INFO` (default), `WARNING`, `ERROR` |
 
+| `WAVE_MCP_TIMEOUT` | No | Per-request timeout in seconds (default 20) |
+| `WAVE_MCP_TOTAL_BUDGET` | No | Total seconds for one call including retries (default 50) |
+
 ## Client configuration
 
-Add to your MCP client config — for Claude Desktop, `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows:
+The server speaks stdio, so any MCP client can launch it. Both paths must be absolute, and `command` should point at the venv's Python so dependencies resolve.
+
+### Claude Code / Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows:
 
 ```json
 {
   "mcpServers": {
-    "wave-accounting": {
+    "wave_mcp": {
       "command": "/absolute/path/to/wave_mcp/.venv/bin/python",
       "args": ["/absolute/path/to/wave_mcp/mcp_server.py"],
       "env": {
@@ -67,7 +74,55 @@ Add to your MCP client config — for Claude Desktop, `~/Library/Application Sup
 }
 ```
 
-Restart the client after saving. Both paths must be absolute.
+Restart the client after saving.
+
+### Codex CLI
+
+Register it with the `codex mcp` command, which writes to `~/.codex/config.toml` atomically:
+
+```bash
+codex mcp add wave_mcp --env WAVE_ACCESS_TOKEN=your_token_here -- /absolute/path/to/wave_mcp/.venv/bin/python /absolute/path/to/wave_mcp/mcp_server.py
+```
+
+Or write the TOML yourself:
+
+```toml
+[mcp_servers.wave_mcp]
+command = "/absolute/path/to/wave_mcp/.venv/bin/python"
+args = ["/absolute/path/to/wave_mcp/mcp_server.py"]
+startup_timeout_sec = 10
+tool_timeout_sec = 60
+
+[mcp_servers.wave_mcp.env]
+WAVE_ACCESS_TOKEN = "your_token_here"
+WAVE_BUSINESS_ID = "your_business_id"
+```
+
+Verify with `codex mcp list` or `codex mcp get wave_mcp`. The CLI and the VS Code extension share this file.
+
+Three Codex-specific notes, all verified against Codex CLI 0.145.0:
+
+- **Startup fits the default timeout.** Codex allows 10 seconds (`startup_timeout_sec`); this server completes `initialize` and `tools/list` in about 0.5s because the Wave client is built lazily on first use, not at import.
+- **Retries fit the tool timeout.** Codex kills a tool call at 60 seconds (`tool_timeout_sec`). The client caps all attempts for one request at `WAVE_MCP_TOTAL_BUDGET` (default 50s) and abandons a retry it cannot finish in time, so you get Wave's real error rather than a client-side timeout. Raise both together if you need longer.
+- **Codex uses tools and `instructions`, not resources.** It reads the server `instructions` field returned at initialize, which this server provides. The seven `wave://` resources below are ignored by Codex; nothing is resource-only, so no capability is lost.
+
+Long `fetch_all=true` sweeps over thousands of records can still exceed 60 seconds. Prefer explicit `page` / `page_size` on large data sets, or raise `tool_timeout_sec` alongside `WAVE_MCP_TOTAL_BUDGET`.
+
+## Resources
+
+Alongside the tools, the server exposes read-only JSON resources for grounding context. Clients that support resources (Claude Desktop) can attach them directly; clients that do not (Codex) reach the same data through tools.
+
+| URI | Contents |
+|-----|----------|
+| `wave://businesses` | Every reachable business |
+| `wave://accounts` | Default business's chart of accounts |
+| `wave://customers` | Customers with balances |
+| `wave://vendors` | Vendors |
+| `wave://products` | Products and services |
+| `wave://sales-taxes` | Sales taxes and rate history |
+| `wave://account-taxonomy` | Account types and subtypes |
+
+All except `wave://businesses` read the default business, so set one first.
 
 ## Getting started
 
@@ -244,13 +299,15 @@ These are constraints in Wave's API, not gaps in this server. Each was confirmed
 ## Development
 
 ```bash
-.venv/bin/python -m pytest tests/ -v      # 39 tests, no network access
+.venv/bin/python -m pytest tests/ -v      # 51 tests, no network access
 .venv/bin/python -m pyflakes wave_mcp/    # lint
 ```
 
-The test suite stubs the transport, so it covers input validation, pagination, error mapping, and every rendering path without touching Wave.
+The test suite stubs the transport, so it covers input validation, pagination, error mapping, retry budgeting, tool metadata, and every rendering path without touching Wave.
 
 Because Wave validates a GraphQL document *before* it checks authentication, every query in this repo can be schema-checked without a token: an `UNAUTHENTICATED` response means the document is valid, while `GRAPHQL_VALIDATION_FAILED` means it is not. All 72 documents are verified this way against the live endpoint.
+
+`evaluation/` holds ten read-only questions in the mcp-builder evaluation format for measuring how well a model drives these tools. The answers are placeholders — see [evaluation/README.md](evaluation/README.md), which explains why they cannot be filled in without a real Wave business.
 
 ### Project structure
 
@@ -258,15 +315,21 @@ Because Wave validates a GraphQL document *before* it checks authentication, eve
 wave_mcp/
 ├── mcp_server.py           # Entry point (unchanged path, for existing configs)
 ├── wave_mcp/
-│   ├── client.py           # GraphQL transport: auth, retries, pagination
+│   ├── client.py           # GraphQL transport: auth, retries, budget, pagination
 │   ├── errors.py           # Exception hierarchy
 │   ├── fragments.py        # Reusable GraphQL fragments
 │   ├── formatting.py       # Markdown and JSON rendering
-│   ├── runtime.py          # Shared FastMCP instance and client
+│   ├── resources.py        # Read-only wave:// resources
+│   ├── runtime.py          # FastMCP instance, tool decorator, shared types
 │   ├── server.py           # Assembly and stdio transport
 │   └── tools/              # One module per API domain
+├── evaluation/             # mcp-builder evaluation questions
 └── tests/test_tools.py
 ```
+
+### Field coverage
+
+Seven schema fields are selected nowhere, all deliberately: `internalId` on four types and `Invoice.anonymousId` are Wave's legacy internal identifiers rather than the API `id`; `InvoicePayment.originInvoicePayment` is a self-reference that would nest without bound; and `OAuthApplication.extraData` is an opaque blob. Everything else on every type this server touches is selected.
 
 ## Upgrading from 1.x
 

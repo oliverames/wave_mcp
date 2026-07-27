@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from .. import fragments as f
 from ..errors import WaveError
 from ..formatting import kv_block, listing, render, success, yes_no
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import compact, decimal_str
 
 LIST_SALES_TAXES = f.build(
@@ -122,16 +122,16 @@ def _normalize_rates(rates: Optional[List[Any]]) -> Optional[List[Dict[str, str]
     return normalized
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_sales_taxes(
     business_id: Optional[str] = None,
     is_archived: Optional[bool] = None,
     modified_after: Optional[str] = None,
     modified_before: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List sales taxes, with their current rate and rate history.
 
@@ -169,11 +169,11 @@ async def wave_list_sales_taxes(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_sales_tax(
     sales_tax_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one sales tax by ID, including its full rate history.
 
@@ -213,14 +213,7 @@ async def wave_get_sales_tax(
     return render(tax, response_format, as_markdown)
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_sales_tax(
     name: str,
     abbreviation: str,
@@ -231,7 +224,7 @@ async def wave_create_sales_tax(
     show_tax_number_on_invoices: Optional[bool] = None,
     is_compound: Optional[bool] = None,
     is_recoverable: Optional[bool] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Create a sales tax.
 
@@ -279,14 +272,7 @@ async def wave_create_sales_tax(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_sales_tax(
     sales_tax_id: str,
     name: Optional[str] = None,
@@ -295,7 +281,7 @@ async def wave_patch_sales_tax(
     tax_number: Optional[str] = None,
     show_tax_number_on_invoices: Optional[bool] = None,
     rates: Optional[List[Dict[str, Any]]] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update a sales tax, including scheduling a new rate.
 
@@ -343,14 +329,7 @@ async def wave_patch_sales_tax(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_archive_sales_tax(sales_tax_id: str) -> str:
     """Archive a sales tax so it stops appearing on new invoices.
 

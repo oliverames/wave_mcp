@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 from .. import fragments as f
 from ..errors import WaveError
 from ..formatting import render, success, table
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import ResponseFormat, business_id_or_default, get_client, tool
 from .common import compact, decimal_str
 
 CREATE_TRANSACTION = f"""
@@ -144,14 +144,7 @@ def _check_balance(anchor_amount: Any, line_items: List[Dict[str, Any]], *, cont
         )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_money_transaction(
     anchor_account_id: str,
     direction: str,
@@ -162,7 +155,7 @@ async def wave_create_money_transaction(
     business_id: Optional[str] = None,
     external_id: Optional[str] = None,
     notes: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record a bookkeeping transaction: an expense, income, or transfer.
 
@@ -244,18 +237,11 @@ async def wave_create_money_transaction(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_money_transactions(
     transactions: List[Dict[str, Any]],
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record several bookkeeping transactions in one call.
 
@@ -349,14 +335,7 @@ async def wave_create_money_transactions(
     return render(created, response_format, as_markdown)
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_deposit_transaction(
     deposit_account_id: str,
     deposit_amount: str,
@@ -368,7 +347,7 @@ async def wave_create_deposit_transaction(
     origin: str = "MANUAL",
     external_id: Optional[str] = None,
     notes: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record a deposit whose net differs from its gross because of fees.
 

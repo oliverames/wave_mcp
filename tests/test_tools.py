@@ -661,3 +661,134 @@ class TestRegistration:
         tools = {t.name: t for t in asyncio.run(build_server().list_tools())}
         for name in ["wave_list_invoices", "wave_get_invoice", "wave_list_accounts"]:
             assert tools[name].annotations.readOnlyHint is True, name
+
+
+# ------------------------------------------------------------ client budgeting
+
+
+class TestRetryBudget:
+    """The retry budget must fit inside the calling client's tool timeout.
+
+    Codex CLI defaults to tool_timeout_sec = 60; if retries outlast that, the
+    client kills the call and the user sees a timeout instead of the real error.
+    """
+
+    def test_defaults_fit_inside_a_sixty_second_tool_timeout(self):
+        from wave_mcp.client import (
+            DEFAULT_MAX_RETRIES,
+            DEFAULT_TIMEOUT,
+            DEFAULT_TOTAL_BUDGET,
+        )
+
+        assert DEFAULT_TOTAL_BUDGET < 60
+        # A single attempt must also fit, or the very first try would overrun.
+        assert DEFAULT_TIMEOUT < DEFAULT_TOTAL_BUDGET
+        assert DEFAULT_MAX_RETRIES >= 2
+
+    def test_budget_is_read_from_the_environment(self, monkeypatch):
+        monkeypatch.setenv("WAVE_ACCESS_TOKEN", "t")
+        monkeypatch.setenv("WAVE_MCP_TOTAL_BUDGET", "12.5")
+        monkeypatch.setenv("WAVE_MCP_TIMEOUT", "5")
+        client = WaveClient.from_env()
+        assert client.total_budget == 12.5
+        assert client.timeout == 5
+
+    def test_unparseable_budget_falls_back_to_the_default(self, monkeypatch):
+        from wave_mcp.client import DEFAULT_TOTAL_BUDGET
+
+        monkeypatch.setenv("WAVE_ACCESS_TOKEN", "t")
+        monkeypatch.setenv("WAVE_MCP_TOTAL_BUDGET", "not-a-number")
+        assert WaveClient.from_env().total_budget == DEFAULT_TOTAL_BUDGET
+
+    def test_retry_is_skipped_when_the_budget_cannot_cover_it(self):
+        # A 5s backoff with 0.5s of budget left must not be attempted; the
+        # error should surface while the MCP client is still listening.
+        assert asyncio.run(WaveClient._sleep_within(5.0, lambda: 0.5)) is False
+        assert asyncio.run(WaveClient._sleep_within(0.0, lambda: 30.0)) is True
+
+
+# ------------------------------------------------------------------- resources
+
+
+class TestResources:
+    def test_reference_resources_are_registered(self):
+        from wave_mcp.server import build_server
+
+        resources = asyncio.run(build_server().list_resources())
+        uris = {str(r.uri) for r in resources}
+        for expected in [
+            "wave://businesses",
+            "wave://accounts",
+            "wave://customers",
+            "wave://vendors",
+            "wave://products",
+            "wave://sales-taxes",
+            "wave://account-taxonomy",
+        ]:
+            assert expected in uris, f"{expected} is not registered"
+
+    def test_resources_declare_json_and_a_description(self):
+        from wave_mcp.server import build_server
+
+        for resource in asyncio.run(build_server().list_resources()):
+            assert resource.mimeType == "application/json", resource.uri
+            assert resource.description, resource.uri
+
+    def test_businesses_resource_returns_parseable_json(self):
+        install(
+            [
+                {
+                    "businesses": {
+                        "pageInfo": {"currentPage": 1, "totalPages": 1, "totalCount": 1},
+                        "edges": [{"node": {"id": "biz-1", "name": "Acme Inc"}}],
+                    }
+                }
+            ]
+        )
+        from wave_mcp.resources import businesses_resource
+
+        payload = json.loads(asyncio.run(businesses_resource()))
+        assert payload[0]["name"] == "Acme Inc"
+
+
+# ------------------------------------------------------- annotations and titles
+
+
+class TestToolMetadata:
+    def test_every_tool_declares_all_four_annotation_hints_and_a_title(self):
+        from wave_mcp.server import build_server
+
+        for t in asyncio.run(build_server().list_tools()):
+            ann = t.annotations
+            assert ann.title, f"{t.name} has no title"
+            assert ann.title.startswith("Wave: "), f"{t.name} title is not namespaced"
+            for hint in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"):
+                assert getattr(ann, hint) is not None, f"{t.name} is missing {hint}"
+
+    def test_read_only_tools_are_also_marked_idempotent(self):
+        from wave_mcp.server import build_server
+
+        for t in asyncio.run(build_server().list_tools()):
+            if t.annotations.readOnlyHint:
+                assert t.annotations.idempotentHint is True, t.name
+
+    def test_response_format_is_a_closed_enum(self):
+        from wave_mcp.server import build_server
+
+        tools = {t.name: t for t in asyncio.run(build_server().list_tools())}
+        schema = tools["wave_list_invoices"].inputSchema["properties"]["response_format"]
+        assert schema["enum"] == ["markdown", "json"]
+
+    def test_page_size_is_bounded_to_waves_maximum(self):
+        from wave_mcp.client import MAX_PAGE_SIZE
+        from wave_mcp.server import build_server
+
+        tools = {t.name: t for t in asyncio.run(build_server().list_tools())}
+        schema = tools["wave_list_invoices"].inputSchema["properties"]["page_size"]
+        assert schema["minimum"] == 1
+        assert schema["maximum"] == MAX_PAGE_SIZE
+
+    def test_server_name_follows_the_python_mcp_convention(self):
+        from wave_mcp.server import build_server
+
+        assert build_server().name == "wave_mcp"

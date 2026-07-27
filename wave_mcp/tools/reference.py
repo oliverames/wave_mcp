@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Optional
 
 from ..formatting import kv_block, render, table, yes_no
-from ..runtime import get_client, mcp
+from ..runtime import ResponseFormat, get_client, tool
 
 GET_USER = """
 query GetUser {
@@ -86,8 +86,8 @@ query GetOAuthApplication {
 """
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
-async def wave_get_user(response_format: str = "markdown") -> str:
+@tool(read_only=True)
+async def wave_get_user(response_format: ResponseFormat = "markdown") -> str:
     """Get the Wave user account that owns the current access token.
 
     Useful for confirming which account a token authenticates as.
@@ -114,10 +114,10 @@ async def wave_get_user(response_format: str = "markdown") -> str:
     return render(user, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_currencies(
     search: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List the currency codes Wave supports.
 
@@ -154,8 +154,8 @@ async def wave_list_currencies(
     return render(currencies, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
-async def wave_get_currency(code: str, response_format: str = "markdown") -> str:
+@tool(read_only=True)
+async def wave_get_currency(code: str, response_format: ResponseFormat = "markdown") -> str:
     """Get one currency by ISO 4217 code.
 
     Args:
@@ -179,10 +179,10 @@ async def wave_get_currency(code: str, response_format: str = "markdown") -> str
     return render(currency, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_countries(
     search: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List the countries Wave supports, with each one's default currency.
 
@@ -215,8 +215,8 @@ async def wave_list_countries(
     return render(countries, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
-async def wave_get_country(code: str, response_format: str = "markdown") -> str:
+@tool(read_only=True)
+async def wave_get_country(code: str, response_format: ResponseFormat = "markdown") -> str:
     """Get one country and its provinces or states.
 
     Use this to find the province codes that address fields expect.
@@ -246,8 +246,8 @@ async def wave_get_country(code: str, response_format: str = "markdown") -> str:
     return render(country, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
-async def wave_get_province(code: str, response_format: str = "markdown") -> str:
+@tool(read_only=True)
+async def wave_get_province(code: str, response_format: ResponseFormat = "markdown") -> str:
     """Get one province or state by its code.
 
     Args:
@@ -270,8 +270,8 @@ async def wave_get_province(code: str, response_format: str = "markdown") -> str
     return render(province, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
-async def wave_list_account_types(response_format: str = "markdown") -> str:
+@tool(read_only=True)
+async def wave_list_account_types(response_format: ResponseFormat = "markdown") -> str:
     """List the five top-level account types in Wave's chart of accounts.
 
     ASSET, LIABILITY, EQUITY, INCOME, and EXPENSE, each with its normal balance.
@@ -295,11 +295,11 @@ async def wave_list_account_types(response_format: str = "markdown") -> str:
     return render(types, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_account_subtypes(
     account_type: Optional[str] = None,
     creatable_only: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List account subtypes -- the value `wave_create_account` needs.
 
@@ -343,8 +343,8 @@ async def wave_list_account_subtypes(
     return render(subtypes, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
-async def wave_get_oauth_application(response_format: str = "markdown") -> str:
+@tool(read_only=True)
+async def wave_get_oauth_application(response_format: ResponseFormat = "markdown") -> str:
     """Get the OAuth application that issued the current access token.
 
     Args:

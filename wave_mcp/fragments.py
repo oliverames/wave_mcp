@@ -3,9 +3,9 @@
 Keeping selection sets in one place means a field is spelled correctly once
 rather than once per query, and it keeps every tool's output shape consistent.
 
-``Money`` is always selected as ``{raw, value, currency {code symbol}}``:
-``value`` is the display string, ``raw`` the integer in minor units for exact
-arithmetic.
+``Money`` is always selected in full: ``value`` is the display string, while
+``raw`` and ``minorUnitValue`` give the amount in minor units for arithmetic
+that must stay exact.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ fragment PageInfoFields on OffsetPageInfo {
 MONEY = """
 fragment MoneyFields on Money {
   raw
+  minorUnitValue
   value
   currency { code symbol }
 }
@@ -174,12 +175,17 @@ fragment InvoicePaymentFields on InvoicePayment {
   transactionId
   confirmationCode
   institutionName
+  authorizerName
   accountNumberLast3
   accountingTransactionId
+  paymentMethodId
   active
   readonlyUrl
   createdAt
   modifiedAt
+  businessCurrency { code symbol }
+  invoiceCurrency { code symbol }
+  paymentCurrency { code symbol }
   account { id name }
   customer { id name }
   paymentDetails { cardType lastFour cardExpiryMonth cardExpiryYear cardSource }
@@ -249,6 +255,18 @@ fragment InvoiceFields on Invoice {
   amountDue { ...MoneyFields }
   amountPaid { ...MoneyFields }
   discounts { ...InvoiceDiscountFields }
+  source {
+    ... on Estimate { id }
+    ... on NewEstimate { id }
+    ... on RecurringInvoice { id }
+  }
+  invoiceReminders {
+    id
+    daysDelta
+    sent
+    sentManually
+    issueDate
+  }
   items {
     id
     description
@@ -265,7 +283,7 @@ fragment InvoiceFields on Invoice {
       salesTax { id name abbreviation }
     }
   }
-  attachments { id fileName fileSize downloadUrl }
+  attachments { id fileName fileSize filePath downloadUrl uploadStatusUpdatedAt }
 }
 """
 
@@ -347,6 +365,8 @@ fragment EstimatePaymentFields on EstimatePayment {
   paymentProvider
   transactionId
   confirmationCode
+  originPaymentId
+  paymentMethodId
   active
   readonlyUrl
   createdAt

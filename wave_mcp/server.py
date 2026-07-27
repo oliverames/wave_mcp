@@ -21,8 +21,8 @@ def build_server():
     load_dotenv()
     configure_logging()
 
-    # Registers all tools as a side effect of import.
-    from . import tools  # noqa: F401
+    # Both register on the shared FastMCP instance as a side effect of import.
+    from . import resources, tools  # noqa: F401
 
     if not os.getenv("WAVE_ACCESS_TOKEN"):
         logger.warning(

@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from typing import Any, Dict, Iterable, List, Optional
 
 import httpx
@@ -45,6 +46,15 @@ DEFAULT_PAGE_SIZE = 50
 # is wrong rather than merely large.
 MAX_PAGES = 500
 
+# MCP clients cap how long a single tool call may run -- Codex CLI defaults to
+# tool_timeout_sec = 60. Retries have to fit inside that, or the client kills
+# the call mid-retry and the user sees a timeout instead of the real error.
+# This budget covers all attempts for one request, backoff included, and is
+# deliberately under 60s.
+DEFAULT_TOTAL_BUDGET = 50.0
+DEFAULT_TIMEOUT = 20.0
+DEFAULT_MAX_RETRIES = 3
+
 
 class WaveClient:
     """Thin, well-instrumented wrapper around Wave's GraphQL endpoint."""
@@ -55,8 +65,9 @@ class WaveClient:
         *,
         endpoint: str = WAVE_ENDPOINT,
         business_id: Optional[str] = None,
-        timeout: float = 30.0,
-        max_retries: int = 3,
+        timeout: float = DEFAULT_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        total_budget: float = DEFAULT_TOTAL_BUDGET,
     ):
         if not access_token:
             raise WaveConfigError(
@@ -68,6 +79,7 @@ class WaveClient:
         self.business_id = business_id
         self.timeout = timeout
         self.max_retries = max_retries
+        self.total_budget = total_budget
         self._client: Optional[httpx.AsyncClient] = None
 
     # ---------------------------------------------------------------- lifecycle
@@ -81,7 +93,12 @@ class WaveClient:
                 "https://developer.waveapps.com/ and put it in your .env file "
                 "or MCP client config."
             )
-        return cls(token, business_id=os.getenv("WAVE_BUSINESS_ID") or None)
+        return cls(
+            token,
+            business_id=os.getenv("WAVE_BUSINESS_ID") or None,
+            timeout=_env_float("WAVE_MCP_TIMEOUT", DEFAULT_TIMEOUT),
+            total_budget=_env_float("WAVE_MCP_TOTAL_BUDGET", DEFAULT_TOTAL_BUDGET),
+        )
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -111,8 +128,12 @@ class WaveClient:
     ) -> Dict[str, Any]:
         """Run a GraphQL document and return its ``data`` payload.
 
-        Retries on 429 and 5xx with exponential backoff. Raises
-        :class:`WaveGraphQLError` when Wave reports document-level errors.
+        Retries on 429 and 5xx with exponential backoff, but never past
+        ``total_budget`` seconds in total, so a retry storm cannot outlast the
+        calling MCP client's own tool timeout.
+
+        Raises :class:`WaveGraphQLError` when Wave reports document-level
+        errors.
         """
         payload: Dict[str, Any] = {"query": query, "variables": _strip_none(variables or {})}
         if operation_name:
@@ -120,26 +141,33 @@ class WaveClient:
 
         client = await self._get_client()
         last_exc: Optional[Exception] = None
+        started = time.monotonic()
+
+        def budget_left() -> float:
+            return self.total_budget - (time.monotonic() - started)
 
         for attempt in range(self.max_retries):
             try:
                 response = await client.post(self.endpoint, json=payload)
             except httpx.TimeoutException as exc:
                 last_exc = exc
-                await self._backoff(attempt)
+                if not await self._sleep_within(_backoff_seconds(attempt), budget_left):
+                    break
                 continue
             except httpx.HTTPError as exc:
                 raise WaveGraphQLError(f"Could not reach the Wave API: {exc}") from exc
 
             if response.status_code == 429:
                 retry_after = _retry_after_seconds(response)
-                if attempt == self.max_retries - 1:
+                delay = retry_after or _backoff_seconds(attempt)
+                if attempt == self.max_retries - 1 or delay >= budget_left():
                     raise WaveRateLimitError(
-                        "Wave rate limit reached. Wait a moment and retry, or "
-                        "request fewer records per call.",
+                        "Wave rate limit reached. Wave allows only about two "
+                        "concurrent requests. Wait a moment and retry, or lower "
+                        "page_size / avoid fetch_all on large lists.",
                         retry_after=retry_after,
                     )
-                await asyncio.sleep(retry_after or _backoff_seconds(attempt))
+                await asyncio.sleep(delay)
                 continue
 
             if response.status_code in (401, 403):
@@ -156,7 +184,8 @@ class WaveClient:
                 )
                 if attempt == self.max_retries - 1:
                     raise last_exc
-                await self._backoff(attempt)
+                if not await self._sleep_within(_backoff_seconds(attempt), budget_left):
+                    break
                 continue
 
             if response.status_code != 200:
@@ -169,7 +198,10 @@ class WaveClient:
             return body.get("data") or {}
 
         raise WaveGraphQLError(
-            f"Wave API did not respond after {self.max_retries} attempts: {last_exc}"
+            f"Wave API did not respond within {self.total_budget:.0f}s across up "
+            f"to {self.max_retries} attempts: {last_exc}. Wave may be slow or "
+            "unreachable; raise WAVE_MCP_TOTAL_BUDGET if your MCP client allows "
+            "a longer tool timeout."
         )
 
     @staticmethod
@@ -203,8 +235,17 @@ class WaveClient:
             )
         raise WaveGraphQLError(f"Wave API error: {messages}", errors)
 
-    async def _backoff(self, attempt: int) -> None:
-        await asyncio.sleep(_backoff_seconds(attempt))
+    @staticmethod
+    async def _sleep_within(delay: float, budget_left) -> bool:
+        """Sleep before a retry, unless the remaining budget cannot cover it.
+
+        Returns False when there is no time left, so the caller stops retrying
+        and surfaces the error while the MCP client is still listening.
+        """
+        if delay >= budget_left():
+            return False
+        await asyncio.sleep(delay)
+        return True
 
     # ---------------------------------------------------------------- mutations
 
@@ -347,6 +388,19 @@ def _strip_none(value: Any) -> Any:
 
 def _backoff_seconds(attempt: int) -> float:
     return min(2.0 ** attempt, 8.0)
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float from the environment, ignoring anything unparseable."""
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning("%s=%r is not a number; using %s", name, raw, default)
+        return default
+    return value if value > 0 else default
 
 
 def _retry_after_seconds(response: httpx.Response) -> Optional[float]:

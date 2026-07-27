@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 from .. import fragments as f
 from ..formatting import kv_block, render, success
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import ResponseFormat, business_id_or_default, get_client, tool
 from .common import compact, decimal_str, normalize_recipients
 
 GET_INVOICE_PAYMENT = f.build(
@@ -177,11 +177,11 @@ def _payment_detail(payment: dict, *, kind: str) -> str:
 # ------------------------------------------------------------- invoice payments
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_invoice_payment(
     payment_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one invoice payment by ID.
 
@@ -206,14 +206,7 @@ async def wave_get_invoice_payment(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_invoice_payment(
     invoice_id: str,
     payment_account_id: str,
@@ -222,7 +215,7 @@ async def wave_create_invoice_payment(
     payment_method: str = "UNSPECIFIED",
     exchange_rate: str = "1",
     memo: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record a manual payment against an invoice.
 
@@ -279,14 +272,7 @@ async def wave_create_invoice_payment(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_invoice_payment(
     payment_id: str,
     payment_account_id: Optional[str] = None,
@@ -295,7 +281,7 @@ async def wave_patch_invoice_payment(
     payment_method: Optional[str] = None,
     exchange_rate: Optional[str] = None,
     memo: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update a recorded invoice payment. Only the fields you supply change.
 
@@ -350,14 +336,7 @@ async def wave_patch_invoice_payment(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_delete_invoice_payment(payment_id: str) -> str:
     """Delete a recorded invoice payment. This cannot be undone.
 
@@ -378,14 +357,7 @@ async def wave_delete_invoice_payment(payment_id: str) -> str:
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_send_invoice_payment_receipt(
     invoice_id: str,
     payment_id: str,
@@ -435,11 +407,11 @@ async def wave_send_invoice_payment_receipt(
 # ------------------------------------------------------ estimate deposit payments
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_estimate_payment(
     payment_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one estimate deposit payment by ID.
 
@@ -464,14 +436,7 @@ async def wave_get_estimate_payment(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_estimate_deposit_payment(
     estimate_id: str,
     amount: str,
@@ -479,7 +444,7 @@ async def wave_create_estimate_deposit_payment(
     payment_method: str = "OTHER",
     payment_account_id: Optional[str] = None,
     memo: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record a deposit received against an estimate.
 
@@ -528,14 +493,7 @@ async def wave_create_estimate_deposit_payment(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_update_estimate_deposit_payment(
     payment_id: str,
     estimate_id: str,
@@ -544,7 +502,7 @@ async def wave_update_estimate_deposit_payment(
     payment_method: Optional[str] = None,
     payment_account_id: Optional[str] = None,
     memo: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update a recorded estimate deposit. Only the fields you supply change.
 
@@ -595,14 +553,7 @@ async def wave_update_estimate_deposit_payment(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_delete_estimate_payment(payment_id: str) -> str:
     """Delete a recorded estimate deposit payment. This cannot be undone.
 
@@ -618,14 +569,7 @@ async def wave_delete_estimate_payment(payment_id: str) -> str:
     return f"Deleted estimate deposit payment `{payment_id}`."
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_send_estimate_deposit_receipt(
     estimate_id: str,
     payment_id: str,

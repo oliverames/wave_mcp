@@ -7,7 +7,7 @@ from typing import Optional
 from .. import fragments as f
 from ..formatting import address as fmt_address
 from ..formatting import kv_block, listing, render, yes_no
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 
 LIST_BUSINESSES = f.build(
     """
@@ -56,15 +56,13 @@ query GetInvoiceEstimateSettings($id: ID!) {
 """
 
 
-@mcp.tool(
-    annotations={"readOnlyHint": True, "openWorldHint": True},
-)
+@tool(read_only=True)
 async def wave_list_businesses(
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     is_archived: Optional[bool] = None,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List the Wave businesses this access token can reach.
 
@@ -105,10 +103,10 @@ async def wave_list_businesses(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_business(
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get full detail for one business: currency, address, type, and settings.
 
@@ -152,14 +150,7 @@ async def wave_get_business(
     return render(business, response_format, as_markdown)
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False,
-    }
-)
+@tool(idempotent=True)
 async def wave_set_default_business(business_id: str) -> str:
     """Set the business that later tool calls use when none is given.
 
@@ -184,10 +175,10 @@ async def wave_set_default_business(business_id: str) -> str:
     )
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_invoice_estimate_settings(
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get the branding applied to invoices and estimates: accent color and logo.
 

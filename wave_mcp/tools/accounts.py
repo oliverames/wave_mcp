@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from .. import fragments as f
 from ..formatting import kv_block, listing, render, success, yes_no
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import compact
 
 LIST_ACCOUNTS = f.build(
@@ -113,17 +113,17 @@ def _account_detail(account: dict) -> str:
     )
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_accounts(
     business_id: Optional[str] = None,
     types: Optional[List[str]] = None,
     subtypes: Optional[List[str]] = None,
     excluded_subtypes: Optional[List[str]] = None,
     is_archived: Optional[bool] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List the chart of accounts, with balances.
 
@@ -170,11 +170,11 @@ async def wave_list_accounts(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_account(
     account_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one account by ID, including its current balance.
 
@@ -192,14 +192,7 @@ async def wave_get_account(
     return render(account, response_format, lambda: _account_detail(account))
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_account(
     name: str,
     subtype: str,
@@ -208,7 +201,7 @@ async def wave_create_account(
     display_id: Optional[str] = None,
     currency: Optional[str] = None,
     can_archive: Optional[bool] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Create an account in the chart of accounts.
 
@@ -258,21 +251,14 @@ async def wave_create_account(
     return render(account, response_format, as_markdown)
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_account(
     account_id: str,
     sequence: int,
     name: Optional[str] = None,
     description: Optional[str] = None,
     display_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update an account's name, description, or display ID.
 
@@ -314,14 +300,7 @@ async def wave_patch_account(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_archive_account(account_id: str) -> str:
     """Archive an account, hiding it from pickers while keeping its history.
 

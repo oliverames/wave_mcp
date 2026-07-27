@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..errors import WaveError
 from ..formatting import render, success
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import ResponseFormat, business_id_or_default, get_client, tool
 from .accounts import LIST_ACCOUNTS
 from .transactions import CREATE_TRANSACTION, _external_id
 
@@ -193,14 +193,7 @@ async def _payment_account(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_expense_from_receipt(
     amount: str,
     date: str,
@@ -211,7 +204,7 @@ async def wave_create_expense_from_receipt(
     payment_account: Optional[str] = None,
     receipt_text: Optional[str] = None,
     notes: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record an expense, matching a category word to an expense account.
 
@@ -291,14 +284,7 @@ async def wave_create_expense_from_receipt(
     return render(transaction, response_format, as_markdown)
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_income_from_payment(
     amount: str,
     date: str,
@@ -309,7 +295,7 @@ async def wave_create_income_from_payment(
     description: Optional[str] = None,
     deposit_to_account: Optional[str] = None,
     notes: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record income, matching a category word to an income account.
 

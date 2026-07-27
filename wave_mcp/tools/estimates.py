@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from .. import fragments as f
 from ..formatting import kv_block, listing, money, render, success, table
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import (
     DEFAULT_ESTIMATE_SORT,
     compact,
@@ -346,7 +346,7 @@ def _estimate_detail(estimate: Dict[str, Any]) -> str:
     return "\n".join(sections)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_estimates(
     business_id: Optional[str] = None,
     status: Optional[str] = None,
@@ -359,10 +359,10 @@ async def wave_list_estimates(
     modified_after: Optional[str] = None,
     modified_before: Optional[str] = None,
     sort: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List estimates (quotes), filtered by status, customer, or date range.
 
@@ -416,14 +416,14 @@ async def wave_list_estimates(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_estimate(
     estimate_id: str,
     business_id: Optional[str] = None,
     include_attachments: bool = True,
     include_history: bool = True,
     include_deposit_payments: bool = True,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one estimate in full: line items, deposits, acceptance history.
 
@@ -453,14 +453,7 @@ async def wave_get_estimate(
     return render(estimate, response_format, lambda: _estimate_detail(estimate))
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_estimate(
     customer_id: str,
     items: List[Dict[str, Any]],
@@ -483,7 +476,7 @@ async def wave_create_estimate(
     disable_bank_payments: Optional[bool] = None,
     disable_amex_payments: Optional[bool] = None,
     require_terms_of_service_agreement: Optional[bool] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Create an estimate (quote).
 
@@ -580,14 +573,7 @@ async def wave_create_estimate(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_estimate(
     estimate_id: str,
     customer_id: str,
@@ -611,7 +597,7 @@ async def wave_patch_estimate(
     disable_bank_payments: Optional[bool] = None,
     disable_amex_payments: Optional[bool] = None,
     require_terms_of_service_agreement: Optional[bool] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update an estimate.
 
@@ -701,17 +687,10 @@ async def wave_patch_estimate(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_clone_estimate(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Copy an estimate into a new draft.
 
@@ -738,17 +717,10 @@ async def wave_clone_estimate(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_approve_estimate(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Approve a draft estimate so it can be sent to the customer.
 
@@ -780,14 +752,7 @@ async def wave_approve_estimate(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_send_estimate(
     estimate_id: str,
     to: Any,
@@ -798,7 +763,7 @@ async def wave_send_estimate(
     from_address: Optional[str] = None,
     hide_grand_total: bool = False,
     include_attachments: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Email an estimate to a customer through Wave.
 
@@ -851,19 +816,12 @@ async def wave_send_estimate(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_mark_estimate_sent(
     estimate_id: str,
     send_method: str = "MARKED_SENT",
     sent_at: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record that an estimate was delivered outside Wave. Sends no email.
 
@@ -896,17 +854,10 @@ async def wave_mark_estimate_sent(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_mark_estimate_accepted(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record that the customer accepted an estimate.
 
@@ -935,17 +886,10 @@ async def wave_mark_estimate_accepted(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_reset_estimate_acceptance(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Undo an estimate's acceptance, returning it to an unaccepted state.
 
@@ -972,17 +916,10 @@ async def wave_reset_estimate_acceptance(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_send_estimate_acceptance_email(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Email the customer a confirmation that their estimate was accepted.
 
@@ -1009,17 +946,10 @@ async def wave_send_estimate_acceptance_email(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_generate_estimate_pdf(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Generate a PDF of an estimate and return its download URL.
 
@@ -1043,17 +973,10 @@ async def wave_generate_estimate_pdf(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_convert_estimate_to_invoice(
     estimate_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Turn an accepted estimate into an invoice.
 
@@ -1083,14 +1006,7 @@ async def wave_convert_estimate_to_invoice(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_delete_estimate(estimate_id: str) -> str:
     """Delete an estimate. This cannot be undone.
 

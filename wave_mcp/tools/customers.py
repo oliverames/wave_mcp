@@ -7,7 +7,7 @@ from typing import List, Optional
 from .. import fragments as f
 from ..formatting import address as fmt_address
 from ..formatting import kv_block, listing, money, render, success, yes_no
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import DEFAULT_CUSTOMER_SORT, compact, optional_address, optional_shipping
 
 LIST_CUSTOMERS = f.build(
@@ -125,7 +125,7 @@ def _customer_detail(customer: dict) -> str:
     )
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_customers(
     business_id: Optional[str] = None,
     email: Optional[str] = None,
@@ -133,10 +133,10 @@ async def wave_list_customers(
     sort: Optional[List[str]] = None,
     modified_after: Optional[str] = None,
     modified_before: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List customers, with each one's outstanding and overdue balance.
 
@@ -193,11 +193,11 @@ async def wave_list_customers(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_customer(
     customer_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one customer by ID, including address and shipping details.
 
@@ -215,14 +215,7 @@ async def wave_get_customer(
     return render(customer, response_format, lambda: _customer_detail(customer))
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_customer(
     name: str,
     business_id: Optional[str] = None,
@@ -252,7 +245,7 @@ async def wave_create_customer(
     shipping_province_code: Optional[str] = None,
     shipping_country_code: Optional[str] = None,
     shipping_postal_code: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Create a customer. Only the name is required.
 
@@ -338,14 +331,7 @@ async def wave_create_customer(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_customer(
     customer_id: str,
     name: Optional[str] = None,
@@ -375,7 +361,7 @@ async def wave_patch_customer(
     shipping_province_code: Optional[str] = None,
     shipping_country_code: Optional[str] = None,
     shipping_postal_code: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update a customer. Only the fields you supply change.
 
@@ -464,14 +450,7 @@ async def wave_patch_customer(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_delete_customer(customer_id: str) -> str:
     """Delete a customer.
 

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from .. import fragments as f
 from ..formatting import kv_block, listing, money, render, success, table
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import (
     DEFAULT_INVOICE_SORT,
     compact,
@@ -288,7 +288,7 @@ def _invoice_detail(invoice: Dict[str, Any]) -> str:
     return "\n".join(sections)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_invoices(
     business_id: Optional[str] = None,
     status: Optional[str] = None,
@@ -301,10 +301,10 @@ async def wave_list_invoices(
     modified_after: Optional[str] = None,
     modified_before: Optional[str] = None,
     sort: Optional[List[str]] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List invoices, filtered by status, customer, date range, or amount due.
 
@@ -360,11 +360,11 @@ async def wave_list_invoices(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_invoice(
     invoice_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one invoice in full: line items, taxes, discounts, and payments.
 
@@ -382,14 +382,7 @@ async def wave_get_invoice(
     return render(invoice, response_format, lambda: _invoice_detail(invoice))
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_invoice(
     customer_id: str,
     items: List[Dict[str, Any]],
@@ -410,7 +403,7 @@ async def wave_create_invoice(
     disable_bank_payments: Optional[bool] = None,
     disable_amex_payments: Optional[bool] = None,
     require_terms_of_service_agreement: Optional[bool] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Create an invoice.
 
@@ -502,14 +495,7 @@ async def wave_create_invoice(
     return render(invoice, response_format, as_markdown)
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_invoice(
     invoice_id: str,
     customer_id: Optional[str] = None,
@@ -530,7 +516,7 @@ async def wave_patch_invoice(
     disable_bank_payments: Optional[bool] = None,
     disable_amex_payments: Optional[bool] = None,
     require_terms_of_service_agreement: Optional[bool] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update an invoice. Only the fields you supply change.
 
@@ -611,17 +597,10 @@ async def wave_patch_invoice(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_clone_invoice(
     invoice_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Copy an invoice into a new draft.
 
@@ -652,17 +631,10 @@ async def wave_clone_invoice(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_approve_invoice(
     invoice_id: str,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Approve a draft invoice, moving it out of DRAFT and into the books.
 
@@ -694,14 +666,7 @@ async def wave_approve_invoice(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_send_invoice(
     invoice_id: str,
     to: Any,
@@ -710,7 +675,7 @@ async def wave_send_invoice(
     attach_pdf: bool = False,
     cc_myself: Optional[bool] = None,
     from_address: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Email an invoice to a customer through Wave.
 
@@ -760,19 +725,12 @@ async def wave_send_invoice(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_mark_invoice_sent(
     invoice_id: str,
     send_method: str = "MARKED_SENT",
     sent_at: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Record that an invoice was delivered outside Wave, without emailing it.
 
@@ -813,14 +771,7 @@ async def wave_mark_invoice_sent(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_delete_invoice(invoice_id: str) -> str:
     """Delete an invoice. This cannot be undone.
 

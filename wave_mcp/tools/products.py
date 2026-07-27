@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from .. import fragments as f
 from ..formatting import kv_block, listing, render, success, yes_no
-from ..runtime import business_id_or_default, get_client, mcp
+from ..runtime import PAGE_SIZE_DEFAULT, PageNumber, PageSize, ResponseFormat, business_id_or_default, get_client, tool
 from .common import DEFAULT_PRODUCT_SORT, compact, decimal_str
 
 LIST_PRODUCTS = f.build(
@@ -129,7 +129,7 @@ def _product_detail(product: dict) -> str:
     )
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_list_products(
     business_id: Optional[str] = None,
     is_sold: Optional[bool] = None,
@@ -139,10 +139,10 @@ async def wave_list_products(
     sort: Optional[List[str]] = None,
     modified_after: Optional[str] = None,
     modified_before: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 50,
+    page: PageNumber = 1,
+    page_size: PageSize = PAGE_SIZE_DEFAULT,
     fetch_all: bool = False,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """List products and services.
 
@@ -196,11 +196,11 @@ async def wave_list_products(
     return render(result, response_format, as_markdown)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
+@tool(read_only=True)
 async def wave_get_product(
     product_id: str,
     business_id: Optional[str] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Get one product by ID, including its accounts and default sales taxes.
 
@@ -218,14 +218,7 @@ async def wave_get_product(
     return render(product, response_format, lambda: _product_detail(product))
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": True,
-    }
-)
+@tool()
 async def wave_create_product(
     name: str,
     unit_price: str,
@@ -234,7 +227,7 @@ async def wave_create_product(
     income_account_id: Optional[str] = None,
     expense_account_id: Optional[str] = None,
     default_sales_tax_ids: Optional[List[str]] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Create a product or service.
 
@@ -285,14 +278,7 @@ async def wave_create_product(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(idempotent=True)
 async def wave_patch_product(
     product_id: str,
     name: Optional[str] = None,
@@ -301,7 +287,7 @@ async def wave_patch_product(
     income_account_id: Optional[str] = None,
     expense_account_id: Optional[str] = None,
     default_sales_tax_ids: Optional[List[str]] = None,
-    response_format: str = "markdown",
+    response_format: ResponseFormat = "markdown",
 ) -> str:
     """Update a product. Only the fields you supply change.
 
@@ -347,14 +333,7 @@ async def wave_patch_product(
     )
 
 
-@mcp.tool(
-    annotations={
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": True,
-    }
-)
+@tool(destructive=True, idempotent=True)
 async def wave_archive_product(product_id: str) -> str:
     """Archive a product, removing it from pickers on new invoices.
 
